@@ -3,6 +3,7 @@ import { Chart, registerables } from "chart.js";
 Chart.register(...registerables); // Chart.js 기본 구성 등록
 
 //플러그인 커스텀
+/*
 const centerTextPlugin = {
   id: "centerText",
   beforeDraw(chart) {
@@ -14,6 +15,7 @@ const centerTextPlugin = {
       ctx.textBaseline = "middle"; // 텍스트 세로 정렬 기준
 
       // 중앙에 표시할 텍스트
+
       //TODO: 추후 수익률 계산이 되면 수익률로 변경하기
       const total = chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
       const text = `${total}%`;
@@ -31,31 +33,28 @@ const centerTextPlugin = {
 
 // 플러그인 등록
 Chart.register(centerTextPlugin);
-
+*/
 // 차트 초기화
-export const initializePieChart = (ctx, stock) => {
-  const labels = stock.map(item => item.stockName); // labels에 주식 이름 설정
-  const data = stock.map(item => item.totalStockPrice); // data에 각 주식의 비율 설정
+export const initializePieChart = (ctx, acquisitionList) => {
   const myPieChart = new Chart(ctx, {
     type: "doughnut",
     data: {
-      // labels: ["Tesla", "Google", "Amazon", "Apple", "Microsoft"],
-      labels: labels,
+      labels: acquisitionList.map((value) => value.stockName.slice(0,10)),
       datasets: [
         {
-          // data: [55, 30, 15, 5, 7],
-          data: data,
+          data: acquisitionList.map((value) => value.percentage),
           backgroundColor: [
             "#4e73df",
             "#1cc88a",
             "#36b9cc",
             "#E74A3B",
             "#F6C23E",
+            "#A549E4",
           ],
-          hoverBackgroundColor: ["#2e59d9", "#17a673", "#2c9faf", "#E7483B", "#F6B23D"],
+          hoverBackgroundColor: ["#2e59d9", "#17a673", "#2c9faf", "#E7483B", "#F6B23D", "#4549E4"],
           hoverBorderColor: "rgba(234, 236, 244, 1)",
           borderWidth: 4, // 도넛의 외곽선 두께
-        },
+        }
       ],
     },
     options: {

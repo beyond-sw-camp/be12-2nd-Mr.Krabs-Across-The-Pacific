@@ -1,4 +1,6 @@
-import { Chart } from 'chart.js';
+import { Chart, registerables } from 'chart.js';
+
+Chart.register(...registerables); // Chart.js 기본 구성 등록
 
 // Number formatting function
 function number_format(number, decimals, dec_point, thousands_sep) {
@@ -29,25 +31,19 @@ function generateRandomData(count, min, max) {
 }
 
 // Initialize Area Chart
-export const initializeAreaChart = (ctx) => {
+export const initializeAreaChart = (ctx, datalist) => {
   return new Chart(ctx, {
     type: 'line',
     data: {
-      labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+      labels: new Array(datalist.length).fill(""),
       datasets: [{
         label: "Earnings",
-        tension: 0.3,
+        tension: 0.01,
         backgroundColor: "rgba(78, 115, 223, 0.05)",
         borderColor: "rgba(78, 115, 223, 1)",
-        pointRadius: 3,
-        pointBackgroundColor: "rgba(78, 115, 223, 1)",
-        pointBorderColor: "rgba(78, 115, 223, 1)",
-        pointHoverRadius: 3,
-        pointHoverBackgroundColor: "rgba(78, 115, 223, 1)",
-        pointHoverBorderColor: "rgba(78, 115, 223, 1)",
-        pointHitRadius: 10,
-        pointBorderWidth: 2,
-        data: generateRandomData(12, -500, 500), // -500에서 500 사이의 데이터 생성
+        pointStyle: null,
+        pointRadius : 0,
+        data: datalist, // 인수로 받은 값 리스트를 반환
       }],
     },
     options: {
@@ -73,8 +69,8 @@ export const initializeAreaChart = (ctx) => {
         },
         y: { // y축 설정
           beginAtZero: false,
-          min: -500, // 최소값 -500
-          max: 500,  // 최대값 500
+          min: -500, // 최소값 -50
+          max: 500,  // 최대값 50
           grid: {
             color: "rgb(234, 236, 244)",
             zeroLineColor: "rgb(234, 236, 244)",
@@ -83,7 +79,7 @@ export const initializeAreaChart = (ctx) => {
             zeroLineBorderDash: [2]
           },
           ticks: {
-            stepSize: 100, // y축 간격
+            stepSize: 10, // y축 간격
             callback: function(value) {
               return number_format(value) + '%';
             }

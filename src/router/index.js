@@ -66,7 +66,7 @@ const routes = [
   },
   { path: "/portfolio/detail/:idx", component: PortfolioDetail },
   { path: "/stock/:idx", component: StockDetail },
-  { path: "/stockList", component: StockList },
+  { path: "/stockList", component: StockList},
   // { path: '/editport', component: CreatePortfolio, beforeEnter: checkLogin }, //로그인 되었는지 확인
   { path: '/signup', component: Signup },
   { path: '/endsignup', component: EndSignup},

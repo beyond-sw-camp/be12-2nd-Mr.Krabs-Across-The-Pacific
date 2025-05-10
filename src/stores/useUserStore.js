@@ -70,6 +70,14 @@ export const useUserStore = defineStore("user", {
         },
         async getUserDetail(id) {
             //axios
+            try {
+                const response = await axios.get('/api/user/mypage');
+                
+                return response.data.result;
+            } catch (e) {
+                console.log("에러:"+ e.message);
+                return null;
+            }
         },
 
         async updateUserDetailReply(password, image) {

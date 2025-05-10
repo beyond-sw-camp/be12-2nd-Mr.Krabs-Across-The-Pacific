@@ -6,7 +6,10 @@ import PortfolioPieChart from './PortfolioPieChart.vue';
 import PortfolioAreaChart from './PortfolioAreaChart.vue';
 import { usePortfolioDetailStore } from '../stores/usePortfolioDetailStore';
 import { usePortfolioRepliesStore } from '../stores/usePortfolioRepliesStore';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute } from 'vue-router';
+import { useRouter } from 'vue-router';
+import { useUserStore } from '../stores/useUserStore';
+import axios from 'axios';
 
 const route = useRoute();
 const router = useRouter();
@@ -14,26 +17,67 @@ const router = useRouter();
 const portfolioDetailStore = usePortfolioDetailStore();
 const portfolioRepliesStore = usePortfolioRepliesStore();
 
+const userStore = useUserStore();
+
 const portfolioStocks = ref([]);
 // const portfolioReplies = ref([]);
 
 const portfolioDetail = ref({
-  idx:'',
-  name:'',
-  own:'',
-  profileImage:'',
-  topStocks:[]
+  idx: '',
+  name: '',
+  own: '',
+  profileImage: '',
+  topStocks: []
 })
 
 const portfolioReplies = ref([]);
 const page = ref(0); // 현재 페이지 번호
 const size = 10; // 한 번에 불러올 개수
 
+
+let portname = ref("");
+let imagelink = ref("");
+let prevAsset = ref(null);
+let currAsset = ref(null);
+let profit = ref(null);
+let topstocks = ref([]);
+let ratings = ref(0);
+let viewers = ref(0);
 onMounted(async () => {
-    portfolioStocks.value = portfolioDetailStore.portfolioItem.portfolio_quantity || {};
-    //포트폴리오 상세 정보 가져오기
-    await portfolioDetailStore.getPortfolioDetail(route.params.idx);
-    portfolioDetail.value = portfolioDetailStore.result;
+  // Portfolio detail 데이터 가져오기
+  await portfolioDetailStore.getPortfolioDetail(route.params.idx);
+  await portfolioRepliesStore.getPortfolioRepliesByCreatedAt(route.params.idx);
+  console.log("Portfolio Detail Loaded:", portfolioDetailStore.result);
+
+  await axios.get(`/api/portfolio/view/${route.params.idx}`);
+
+
+  // 계산해서 총 수익률 구하기
+  prevAsset.value = portfolioDetailStore.result.acquisitionList.reduce((prev, curr) => {
+    prev += curr.quantity * curr.price;
+    return prev;
+  }, 0);
+
+  portfolioDetail.value.name = portfolioDetailStore.$state.result.name;
+  portfolioDetail.value.topstocks = portfolioDetailStore.$state.result.topStocks;
+  viewers.value = portfolioDetailStore.$state.result.viewCnt;
+
+  Promise.all(portfolioDetailStore.result.acquisitionList
+    .map((value) => [value.stockCode, value.price, value.quantity])
+    .map(async ([code, price, quantity]) => {
+      const recentprice = await portfolioDetailStore.getRecentPrice(code);
+      return [recentprice * quantity, (price - recentprice) * quantity];
+    })).then((response) => {
+      currAsset.value = response.reduce((prev, curr) => prev + curr[0], 0).toFixed(2);
+      profit.value = (portfolioDetailStore.$state.result.profit * 100 / currAsset.value).toFixed(2);
+    });
+  ratings.value = portfolioDetailStore.$state.result.ratings;
+
+  // Portfolio replies 데이터 가져오기
+  console.log("Portfolio Replies Loaded:", portfolioRepliesStore.portfolioReplies);
+  // 데이터를 vue의 상태에 반영
+  portfolioStocks.value = portfolioDetailStore.result.topStocks || {};
+  portfolioReplies.value = portfolioRepliesStore.portfolioReplies || [];
 });
 
 const loadReplies = async $state => {
@@ -42,7 +86,7 @@ const loadReplies = async $state => {
     if (response.length < 1) {
       console.log("더 이상 불러올 데이터 없음.");
       $state.complete();
-    }else{
+    } else {
       portfolioReplies.value.push(...response);
       $state.loaded();
     }
@@ -66,10 +110,10 @@ const submitReply = async () => {
   }
 
   const newReply = {
-    userName: "현재 사용자", // 사용자 이름
+    // username: "현재 사용자", // 사용자 이름
     content: newReplyContent.value,
-    createdAt: new Date().toISOString(), // 현재 시간
-    updatedAt: new Date().toISOString(),
+    // createdAt: new Date().toISOString(), // 현재 시간
+    // updatedAt: new Date().toISOString(),
   };
 
   try {
@@ -81,28 +125,29 @@ const submitReply = async () => {
   }
 };
 
+//const username = '멍자';
+//const portfolioIdx = portfolioDetailStore.$state.result.idx;
 const updateBtn = () => {
   router.push({
-name: 'Portfolio', // 라우트 이름
-    params: { mode: 'update' },
-    state: { username:"멍자", portfolioIdx: 1,}
+    path: '/editport',
+    state: { username: "멍자", portfolioIdx: 1, portStatus: false },
   });
 };
 
 const deleteBtn = () => {
   const isConfirmed = confirm('정말로 삭제하시겠습니까?');
   if (isConfirmed) {
-    //TODO 
-    router.push({ path: `/`});
+    //TODO
+    router.push({ path: `/` });
   }
 };
 
 const goToUserInfo = async (userIdx, userName) => {
-router.push({
-      name: "UserPortfolioList",
-      params: { userIdx },
-      query: { userName },
-    });
+  router.push({
+    name: "UserPortfolioList",
+    params: { userIdx },
+    query: { userName },
+  });
 };
 </script>
 
@@ -124,8 +169,10 @@ router.push({
                     style="color:transparent" :src="portfolioDetail.profileImage || '/images/멍자.png'"  />
                 </router-link> -->
                 <div>
-                  <img @click="goToUserInfo(portfolioDetail.userIdx, portfolioDetail.userName)" alt="profile" fetchpriority="high" width="128" height="128" decoding="async" data-nimg="1"
-                    style="color:transparent" :src="portfolioDetail.profileImage || '/images/멍자.png'"  />
+                  <h1 class="h3 mb-0 text-gray-800">{{ portname }} 포트폴리오</h1>
+                  <img @click="goToUserInfo(portfolioDetail.userIdx, portfolioDetail.userName)" alt="profile"
+                    fetchpriority="high" width="128" height="128" decoding="async" data-nimg="1"
+                    style="color:transparent" :src="portfolioDetail.profileImage || '/images/멍자.png'" />
                 </div>
                 <div>
                   <h1 class="h3 mb-0 text-gray-800">{{ portfolioDetail.name }}</h1>
@@ -145,7 +192,7 @@ router.push({
                         <div class="col mr-2">
                           <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
                             STARTED WITH(투자 금액)</div>
-                          <div class="h5 mb-0 font-weight-bold text-gray-800">$40,000</div>
+                          <div class="h5 mb-0 font-weight-bold text-gray-800">${{ prevAsset }}</div>
                         </div>
                         <div class="col-auto">
                           <i class="fas fa-calendar fa-2x text-gray-300"></i>
@@ -163,7 +210,7 @@ router.push({
                         <div class="col mr-2">
                           <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
                             CURRENT ASSETS(현재 자산)</div>
-                          <div class="h5 mb-0 font-weight-bold text-gray-800">$215,000</div>
+                          <div class="h5 mb-0 font-weight-bold text-gray-800">${{ currAsset }}</div>
                         </div>
                         <div class="col-auto">
                           <i class="fas fa-dollar-sign fa-2x text-gray-300"></i>
@@ -184,7 +231,7 @@ router.push({
                           </div>
                           <div class="row no-gutters align-items-center">
                             <div class="col-auto">
-                              <div class="h5 mb-0 mr-3 font-weight-bold text-gray-800">+112%</div>
+                              <div class="h5 mb-0 mr-3 font-weight-bold text-gray-800">{{ profit }}%</div>
                             </div>
                             <div class="col">
                               <div class="progress progress-sm mr-2">
@@ -209,8 +256,8 @@ router.push({
                       <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                           <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
-                            RATINGS(평가 손익)</div>
-                          <div class="h5 mb-0 font-weight-bold text-gray-800">18</div>
+                            RATINGS(평가 순위)</div>
+                          <div class="h5 mb-0 font-weight-bold text-gray-800">{{ ratings }}</div>
                         </div>
                         <div class="col-auto">
                           <i class="fas fa-comments fa-2x text-gray-300"></i>
@@ -247,7 +294,7 @@ router.push({
                     </div>
                     <!-- Card Body -->
                     <div class="card-body" style="white-space:pre-wrap; overflow-wrap: break-word;">
-                      <PortfolioPieChart :portfolioStocks="portfolioDetail.topStocks"/>
+                      <PortfolioPieChart :portfolioStocks="portfolioDetail.topStocks" />
                     </div>
                   </div>
                 </div>
@@ -267,36 +314,36 @@ router.push({
         </div>
 
 
-              </div>
-              <!-- Content Row -->
-              <div class="row">
-                <!-- Area Chart -->
-                <div class="col-xl-12 col-lg-12">
-                  <div class="card shadow mb-4">
-                    <!-- Card Header - Dropdown -->
-                    <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                      <h6 class="m-0 font-weight-bold text-primary">Earnings Overview</h6>
-                      <div class="dropdown no-arrow">
-                        <a class="dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-toggle="dropdown"
-                          aria-haspopup="true" aria-expanded="false">
-                          <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
-                        </a>
-                        <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in"
-                          aria-labelledby="dropdownMenuLink">
-                          <div class="dropdown-header">Dropdown Header:</div>
-                          <a class="dropdown-item" href="#">Action</a>
-                          <a class="dropdown-item" href="#">Another action</a>
-                          <div class="dropdown-divider"></div>
-                          <a class="dropdown-item" href="#">Something else here</a>
-                        </div>
-                      </div>
-                    </div>
-                    <!-- Card Body -->
-                    <div class="card-body" style="white-space:pre-wrap; overflow-wrap: break-word;">
-                        <PortfolioAreaChart />
-                    </div>
-                  </div>
+      </div>
+      <!-- Content Row -->
+      <div class="row">
+        <!-- Area Chart -->
+        <div class="col-xl-12 col-lg-12">
+          <div class="card shadow mb-4">
+            <!-- Card Header - Dropdown -->
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+              <h6 class="m-0 font-weight-bold text-primary">Earnings Overview</h6>
+              <div class="dropdown no-arrow">
+                <a class="dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-toggle="dropdown"
+                  aria-haspopup="true" aria-expanded="false">
+                  <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+                </a>
+                <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in"
+                  aria-labelledby="dropdownMenuLink">
+                  <div class="dropdown-header">Dropdown Header:</div>
+                  <a class="dropdown-item" href="#">Action</a>
+                  <a class="dropdown-item" href="#">Another action</a>
+                  <div class="dropdown-divider"></div>
+                  <a class="dropdown-item" href="#">Something else here</a>
                 </div>
+              </div>
+            </div>
+            <!-- Card Body -->
+            <div class="card-body" style="white-space:pre-wrap; overflow-wrap: break-word;">
+              <PortfolioAreaChart />
+            </div>
+          </div>
+        </div>
 
       </div>
 
@@ -342,7 +389,9 @@ router.push({
           <PortfolioReply v-for="reply in portfolioReplies" :reply="reply" :key="reply.idx" />
           <!-- <InfiniteLoading @infinite="loadReplies"/> -->
           <InfiniteLoading @infinite="loadReplies">
-            <template #complete><div></div></template>
+            <template #complete>
+              <div></div>
+            </template>
           </InfiniteLoading>
         </div>
 

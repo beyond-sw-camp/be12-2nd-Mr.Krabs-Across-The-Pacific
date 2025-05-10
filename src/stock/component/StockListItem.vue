@@ -1,5 +1,6 @@
 <script setup>
 import { defineProps, ref } from "vue";
+import { useStockListStore } from "../../stores/useStockListStore.js";
 import LineChart from "../../components/LineChart.vue";
 const props = defineProps({
   information: Object, // 종목 칸을 채우는 객체형 정보
@@ -8,8 +9,10 @@ let id = ref(0);
 let code = ref("d");
 let name = ref("d");
 let market = ref("d");
-let price = ref("d");
+let price = ref("");
 let likes = ref(0);
+
+const stockListStore = useStockListStore();
 
 // information으로부터 정보 추출해서 대입
 const response = props.information;
@@ -17,8 +20,12 @@ id.value = response.id;
 code.value = response.code;
 name.value = response.name.replace(" Common Stock", "");
 market.value = response.market;
-price.value = response.price; 
+price.value = response.price;
 likes.value = response.likesCount;
+
+stockListStore.getRecentPrice(code.value).then((result) => {
+  price.value = "$" + result;
+})
 
 const scrollToTop = () => {
   // 이게 있어야 라우팅 후 맨 위로 자동 스크롤 됨
@@ -40,7 +47,7 @@ const scrollToTop = () => {
       </div>
     </div>
     <!-- TODO: 그래프? -->
-    <LineChart :id="id" />
+    <LineChart :id="id" :code="code" />
     <div class="card-body bold-weight" style="max-width: 160px">
       <div class="listbox-item">
         최근 가격:<br />
